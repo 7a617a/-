@@ -1,0 +1,772 @@
+﻿﻿﻿﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本处理工具（行号样式增强版）</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        body {
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        /* 标签页样式 */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            background: #eee;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background: white;
+            border-color: #ccc;
+            border-bottom-color: white;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* 带行号的文本容器样式（核心） */
+        .text-area-group {
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .line-number-wrapper {
+            display: flex;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            overflow: hidden;
+            height: 200px;
+            resize: vertical;
+        }
+        /* 行号栏样式 */
+        .line-numbers {
+            width: 40px;
+            background-color: #f0f0f0;
+            padding: 10px 0;
+            text-align: right;
+            font-family: Consolas, monospace;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+            user-select: none; /* 禁止选中行号 */
+            overflow: hidden;
+        }
+        .line-numbers span {
+            display: block;
+            padding-right: 5px;
+        }
+        /* 内容区样式 */
+        .text-content {
+            flex: 1;
+            padding: 10px;
+            font-size: 14px;
+            line-height: 1.5;
+            font-family: "Microsoft YaHei", sans-serif;
+            color: #333;
+            background-color: #fff;
+            border: none;
+            outline: none;
+            resize: none;
+            overflow: auto;
+        }
+        .line-count {
+            font-size: 12px;
+            color: #666;
+            margin: 5px 0 10px 0;
+        }
+        /* 按钮和功能区样式 */
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            /* 统一按钮基线对齐 */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        /* 新增：清空按钮专属样式（红色系，与辅助按钮灰色区分） */
+        .btn-clear {
+            background: #dc3545;
+        }
+        .btn-clear:hover {
+            background: #c82333;
+        }
+        /* 调整小按钮样式，使其与普通辅助按钮尺寸一致 */
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 14px;
+        }
+        .func-item {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+            margin-bottom: 8px;
+        }
+        input[type="checkbox"], input[type="radio"] {
+            margin-right: 5px;
+        }
+        input[type="text"], input[type="number"] {
+            padding: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 60px;
+            margin: 0 5px;
+        }
+        input[type="number"] {
+            width: 50px;
+        }
+        /* 替换功能输入框宽度调整 */
+        #find-text, #replace-with-text {
+            width: 100px;
+        }
+        h4 {
+            margin: 10px 0;
+            color: #333;
+            width: 100%;
+        }
+        .sort-group, .char-count-group {
+            border-left: 2px solid #ddd;
+            padding-left: 10px;
+            margin-left: 10px;
+        }
+        .char-count-group {
+            margin-top: 5px;
+        }
+        /* 新增：文本框下方按钮组样式，确保按钮对齐且间距统一 */
+        .text-ctrl-btn-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 标签页切换 -->
+        <div class="tabs">
+            <div class="tab active" data-tab="single-text">单文本处理</div>
+            <div class="tab" data-tab="multi-text">多文本处理</div>
+        </div>
+
+        <!-- 单文本处理标签页 -->
+        <div class="tab-content active" id="single-text">
+            <div class="text-area-group">
+                <h4>输入文本</h4>
+                <!-- 带行号的输入容器 -->
+                <div class="line-number-wrapper" id="single-input-wrapper">
+                    <div class="line-numbers" id="single-input-lines"></div>
+                    <textarea class="text-content" id="single-input" placeholder="请粘贴文本内容，或点击下方按钮加载文本文件..."></textarea>
+                </div>
+                <div class="line-count" id="single-input-count">行数：0</div>
+                <!-- 优化按钮组布局 -->
+                <div class="text-ctrl-btn-group">
+                    <button class="btn btn-secondary" onclick="loadFile('single-input')">从文件加载</button>
+                    <button class="btn btn-clear" onclick="clearSingleInput()">清空输入框</button>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <h4>基础处理功能</h4>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-duplicate">
+                    <label for="remove-duplicate">去重复行</label>
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-empty">
+                    <label for="remove-empty">去空行</label>
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-start-space">
+                    <label for="remove-start-space">去行首空格</label>
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-end-space">
+                    <label for="remove-end-space">去行尾空格</label>
+                </div>
+                
+                <h4>排序功能</h4>
+                <div class="func-item">
+                    <input type="checkbox" id="sort-full-line">
+                    <label for="sort-full-line">按整行字符依次排序</label>
+                </div>
+                <div class="func-item sort-group">
+                    <input type="radio" name="sort-full-type" id="sort-full-asc" checked>
+                    <label for="sort-full-asc">正序</label>
+                </div>
+                <div class="func-item sort-group">
+                    <input type="radio" name="sort-full-type" id="sort-full-desc">
+                    <label for="sort-full-desc">倒序</label>
+                </div>
+                
+                <div class="func-item">
+                    <input type="checkbox" id="sort-by-length">
+                    <label for="sort-by-length">按行字符数量排序</label>
+                </div>
+                <div class="func-item sort-group">
+                    <input type="radio" name="sort-length-type" id="sort-length-asc" checked>
+                    <label for="sort-length-asc">正序（少→多）</label>
+                </div>
+                <div class="func-item sort-group">
+                    <input type="radio" name="sort-length-type" id="sort-length-desc">
+                    <label for="sort-length-desc">倒序（多→少）</label>
+                </div>
+                
+                <h4>行首尾字符处理</h4>
+                <div class="func-item">
+                    <input type="checkbox" id="add-start-char">
+                    <label for="add-start-char">行首添加</label>
+                    <input type="text" id="start-char" value="*">
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-start-char">
+                    <label for="remove-start-char">行首去除</label>
+                    <input type="text" id="rm-start-char" value="*">
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="add-end-char">
+                    <label for="add-end-char">行尾添加</label>
+                    <input type="text" id="end-char" value="*">
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-end-char">
+                    <label for="remove-end-char">行尾去除</label>
+                    <input type="text" id="rm-end-char" value="*">
+                </div>
+                
+                <div class="func-item char-count-group">
+                    <input type="checkbox" id="remove-start-count">
+                    <label for="remove-start-count">行首去除</label>
+                    <input type="number" id="start-count-remove" value="1" min="1">
+                    <label for="remove-start-count">个字符</label>
+                </div>
+                <div class="func-item char-count-group">
+                    <input type="checkbox" id="keep-start-count">
+                    <label for="keep-start-count">行首保留</label>
+                    <input type="number" id="start-count-keep" value="1" min="1">
+                    <label for="keep-start-count">个字符</label>
+                </div>
+                <div class="func-item char-count-group">
+                    <input type="checkbox" id="remove-end-count">
+                    <label for="remove-end-count">行尾去除</label>
+                    <input type="number" id="end-count-remove" value="1" min="1">
+                    <label for="remove-end-count">个字符</label>
+                </div>
+                <div class="func-item char-count-group">
+                    <input type="checkbox" id="keep-end-count">
+                    <label for="keep-end-count">行尾保留</label>
+                    <input type="number" id="end-count-keep" value="1" min="1">
+                    <label for="keep-end-count">个字符</label>
+                </div>
+
+                <!-- 新增：文本替换功能 -->
+                <h4>文本替换功能</h4>
+                <div class="func-item">
+                    <input type="checkbox" id="replace-text">
+                    <label for="replace-text">替换文本</label>
+                    <input type="text" id="find-text" placeholder="查找内容">
+                    <label for="replace-text">为</label>
+                    <input type="text" id="replace-with-text" placeholder="替换为">
+                </div>
+                
+                <h4>行筛选功能</h4>
+                <div class="func-item">
+                    <input type="checkbox" id="remove-contain">
+                    <label for="remove-contain">去除包含</label>
+                    <input type="text" id="contain-remove" value="*">
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="keep-contain">
+                    <label for="keep-contain">保留包含</label>
+                    <input type="text" id="contain-keep" value="*">
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="keep-before">
+                    <label for="keep-before">保留</label>
+                    <input type="text" id="split-char" value="*">
+                    <label for="keep-before">之前文本</label>
+                </div>
+                <div class="func-item">
+                    <input type="checkbox" id="keep-after">
+                    <label for="keep-after">保留</label>
+                    <input type="text" id="split-char2" value="*">
+                    <label for="keep-after">之后文本</label>
+                </div>
+                
+                <button class="btn" style="width: 100%; margin-top: 10px;" onclick="processSingleText()">执行处理</button>
+                <button class="btn btn-secondary" style="width: 100%;" onclick="clearSingleAll()">清空所有内容</button>
+            </div>
+
+            <div class="text-area-group">
+                <h4>输出结果</h4>
+                <!-- 带行号的输出容器 -->
+                <div class="line-number-wrapper" id="single-output-wrapper">
+                    <div class="line-numbers" id="single-output-lines"></div>
+                    <textarea class="text-content" id="single-output" readonly placeholder="处理后的文本将显示在这里..."></textarea>
+                </div>
+                <div class="line-count" id="single-output-count">行数：0</div>
+                <!-- 优化按钮组布局 -->
+                <div class="text-ctrl-btn-group">
+                    <button class="btn btn-secondary" onclick="copyText('single-output')">复制结果</button>
+                    <button class="btn btn-clear" onclick="clearSingleOutput()">清空输出框</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 多文本处理标签页 -->
+        <div class="tab-content" id="multi-text">
+            <div class="text-area-group">
+                <h4>文本A</h4>
+                <!-- 带行号的文本A容器 -->
+                <div class="line-number-wrapper" id="multi-input-a-wrapper">
+                    <div class="line-numbers" id="multi-input-a-lines"></div>
+                    <textarea class="text-content" id="multi-input-a" placeholder="请粘贴文本A内容，或点击下方按钮加载文本文件..."></textarea>
+                </div>
+                <div class="line-count" id="multi-input-a-count">行数：0</div>
+                <!-- 优化按钮组布局 -->
+                <div class="text-ctrl-btn-group">
+                    <button class="btn btn-secondary" onclick="loadFile('multi-input-a')">从文件加载</button>
+                    <button class="btn btn-clear" onclick="clearMultiInput('a')">清空文本A</button>
+                </div>
+            </div>
+
+            <div class="text-area-group">
+                <h4>文本B</h4>
+                <!-- 带行号的文本B容器 -->
+                <div class="line-number-wrapper" id="multi-input-b-wrapper">
+                    <div class="line-numbers" id="multi-input-b-lines"></div>
+                    <textarea class="text-content" id="multi-input-b" placeholder="请粘贴文本B内容，或点击下方按钮加载文本文件..."></textarea>
+                </div>
+                <div class="line-count" id="multi-input-b-count">行数：0</div>
+                <!-- 优化按钮组布局 -->
+                <div class="text-ctrl-btn-group">
+                    <button class="btn btn-secondary" onclick="loadFile('multi-input-b')">从文件加载</button>
+                    <button class="btn btn-clear" onclick="clearMultiInput('b')">清空文本B</button>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <h4>集合运算</h4>
+                <button class="btn" onclick="calcUnion()">求并集（去重）</button>
+                <button class="btn" onclick="calcIntersection()">求交集</button>
+                <button class="btn" onclick="calcDifference('a-b')">求差集（A-B）</button>
+                <button class="btn" onclick="calcDifference('b-a')">求差集（B-A）</button>
+                
+                <h4>包含筛选</h4>
+                <button class="btn" onclick="filterBContainA()">从B中筛选包含A内容的行</button>
+                <button class="btn" onclick="filterAContainB()">从A中筛选包含B内容的行</button>
+                
+                <h4>按行合并</h4>
+                <div class="func-item">
+                    <label for="merge-sep">分隔符：</label>
+                    <input type="text" id="merge-sep" value="|">
+                </div>
+                <button class="btn" onclick="mergeLines()">按行合并</button>
+                
+                <button class="btn btn-secondary" style="width: 100%; margin-top: 10px;" onclick="clearMultiAll()">清空所有内容</button>
+            </div>
+
+            <div class="text-area-group">
+                <h4>输出结果</h4>
+                <!-- 带行号的多文本输出容器 -->
+                <div class="line-number-wrapper" id="multi-output-wrapper">
+                    <div class="line-numbers" id="multi-output-lines"></div>
+                    <textarea class="text-content" id="multi-output" readonly placeholder="处理后的文本将显示在这里..."></textarea>
+                </div>
+                <div class="line-count" id="multi-output-count">行数：0</div>
+                <!-- 优化按钮组布局 -->
+                <div class="text-ctrl-btn-group">
+                    <button class="btn btn-secondary" onclick="copyText('multi-output')">复制结果</button>
+                    <button class="btn btn-clear" onclick="clearMultiOutput()">清空输出框</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 标签页切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // 核心函数：更新行号显示（无冒号，纯数字）
+        function updateLineNumbers(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            const lineNumbersEl = document.getElementById(`${textareaId}-lines`);
+            const text = textarea.value;
+            const lines = text === '' ? [] : text.split('\n');
+            const lineCount = lines.length;
+            
+            // 生成行号HTML（纯数字，无冒号）
+            let lineNumbersHTML = '';
+            for (let i = 1; i <= lineCount; i++) {
+                lineNumbersHTML += `<span>${i}</span>`;
+            }
+            lineNumbersEl.innerHTML = lineNumbersHTML;
+            
+            // 同步滚动
+            textarea.addEventListener('scroll', () => {
+                lineNumbersEl.scrollTop = textarea.scrollTop;
+            });
+            
+            // 更新行数统计
+            document.getElementById(`${textareaId}-count`).textContent = `行数：${lineCount}`;
+        }
+
+        // 初始化行号监听
+        window.onload = function() {
+            // 单文本行号监听
+            const singleInput = document.getElementById('single-input');
+            singleInput.addEventListener('input', () => updateLineNumbers('single-input'));
+            const singleOutput = document.getElementById('single-output');
+            singleOutput.addEventListener('input', () => updateLineNumbers('single-output'));
+            
+            // 多文本行号监听
+            const multiInputA = document.getElementById('multi-input-a');
+            multiInputA.addEventListener('input', () => updateLineNumbers('multi-input-a'));
+            const multiInputB = document.getElementById('multi-input-b');
+            multiInputB.addEventListener('input', () => updateLineNumbers('multi-input-b'));
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.addEventListener('input', () => updateLineNumbers('multi-output'));
+            
+            // 初始更新所有行号
+            updateLineNumbers('single-input');
+            updateLineNumbers('single-output');
+            updateLineNumbers('multi-input-a');
+            updateLineNumbers('multi-input-b');
+            updateLineNumbers('multi-output');
+
+            // 同步容器高度调整（resize）
+            document.querySelectorAll('.line-number-wrapper').forEach(wrapper => {
+                const textarea = wrapper.querySelector('.text-content');
+                textarea.addEventListener('resize', () => {
+                    wrapper.style.height = `${textarea.offsetHeight}px`;
+                });
+            });
+        };
+
+        // 加载文件到文本框（自动更新行号）
+        function loadFile(targetId) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.txt';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const textarea = document.getElementById(targetId);
+                    textarea.value = event.target.result;
+                    updateLineNumbers(targetId); // 更新行号
+                };
+                reader.readAsText(file, 'utf-8');
+            };
+            input.click();
+        }
+
+        // 复制文本（仅复制内容，不含行号）
+        function copyText(targetId) {
+            const textarea = document.getElementById(targetId);
+            textarea.select();
+            document.execCommand('copy');
+            alert('复制成功（仅文本内容，不含行号）！');
+        }
+
+        // 单文本处理核心逻辑
+        function processSingleText() {
+            // 1. 获取输入纯内容
+            const inputText = document.getElementById('single-input').value;
+            let lines = inputText === '' ? [] : inputText.split('\n');
+            
+            // 2. 基础处理
+            if (document.getElementById('remove-duplicate').checked) {
+                const seen = new Set();
+                lines = lines.filter(line => !seen.has(line) && seen.add(line));
+            }
+            if (document.getElementById('remove-empty').checked) {
+                lines = lines.filter(line => line.trim() !== '');
+            }
+            if (document.getElementById('remove-start-space').checked) {
+                lines = lines.map(line => line.replace(/^\s+/, ''));
+            }
+            if (document.getElementById('remove-end-space').checked) {
+                lines = lines.map(line => line.replace(/\s+$/, ''));
+            }
+
+            // 3. 排序处理
+            if (document.getElementById('sort-full-line').checked) {
+                const isAsc = document.getElementById('sort-full-asc').checked;
+                lines.sort((a, b) => {
+                    return isAsc ? a.localeCompare(b) : b.localeCompare(a);
+                });
+            }
+            if (document.getElementById('sort-by-length').checked) {
+                const isAsc = document.getElementById('sort-length-asc').checked;
+                lines.sort((a, b) => {
+                    const lenA = a.length;
+                    const lenB = b.length;
+                    return isAsc ? lenA - lenB : lenB - lenA;
+                });
+            }
+
+            // 4. 行首尾字符处理（基础）
+            if (document.getElementById('add-start-char').checked) {
+                const char = document.getElementById('start-char').value;
+                lines = lines.map(line => char + line);
+            }
+            if (document.getElementById('remove-start-char').checked) {
+                const char = document.getElementById('rm-start-char').value;
+                lines = lines.map(line => line.startsWith(char) ? line.slice(char.length) : line);
+            }
+            if (document.getElementById('add-end-char').checked) {
+                const char = document.getElementById('end-char').value;
+                lines = lines.map(line => line + char);
+            }
+            if (document.getElementById('remove-end-char').checked) {
+                const char = document.getElementById('rm-end-char').value;
+                lines = lines.map(line => line.endsWith(char) ? line.slice(0, -char.length) : line);
+            }
+
+            // 5. 行首尾字符处理（按字符数）
+            if (document.getElementById('remove-start-count').checked) {
+                const count = parseInt(document.getElementById('start-count-remove').value) || 1;
+                lines = lines.map(line => line.slice(count));
+            }
+            if (document.getElementById('keep-start-count').checked) {
+                const count = parseInt(document.getElementById('start-count-keep').value) || 1;
+                lines = lines.map(line => line.slice(0, count));
+            }
+            if (document.getElementById('remove-end-count').checked) {
+                const count = parseInt(document.getElementById('end-count-remove').value) || 1;
+                lines = lines.map(line => line.slice(0, -count));
+            }
+            if (document.getElementById('keep-end-count').checked) {
+                const count = parseInt(document.getElementById('end-count-keep').value) || 1;
+                lines = lines.map(line => line.slice(-count));
+            }
+
+            // 6. 文本替换处理（新增核心逻辑）
+            if (document.getElementById('replace-text').checked) {
+                const findStr = document.getElementById('find-text').value;
+                const replaceStr = document.getElementById('replace-with-text').value;
+                // 仅当查找内容不为空时执行替换（全局替换）
+                if (findStr !== '') {
+                    lines = lines.map(line => line.replaceAll(findStr, replaceStr));
+                }
+            }
+
+            // 7. 行筛选处理
+            if (document.getElementById('remove-contain').checked) {
+                const char = document.getElementById('contain-remove').value;
+                lines = lines.filter(line => !line.includes(char));
+            }
+            if (document.getElementById('keep-contain').checked) {
+                const char = document.getElementById('contain-keep').value;
+                lines = lines.filter(line => line.includes(char));
+            }
+            if (document.getElementById('keep-before').checked) {
+                const char = document.getElementById('split-char').value;
+                lines = lines.map(line => line.split(char)[0]);
+            }
+            if (document.getElementById('keep-after').checked) {
+                const char = document.getElementById('split-char2').value;
+                lines = lines.map(line => {
+                    const index = line.indexOf(char);
+                    return index === -1 ? '' : line.slice(index + char.length);
+                });
+            }
+
+            // 8. 输出结果并更新行号
+            const outputText = lines.join('\n');
+            const singleOutput = document.getElementById('single-output');
+            singleOutput.value = outputText;
+            updateLineNumbers('single-output');
+        }
+
+        // 单文本清空函数
+        function clearSingleInput() {
+            const singleInput = document.getElementById('single-input');
+            singleInput.value = '';
+            updateLineNumbers('single-input');
+        }
+        function clearSingleOutput() {
+            const singleOutput = document.getElementById('single-output');
+            singleOutput.value = '';
+            updateLineNumbers('single-output');
+        }
+        function clearSingleAll() {
+            clearSingleInput();
+            clearSingleOutput();
+            document.querySelectorAll('#single-text input[type="checkbox"]').forEach(cb => cb.checked = false);
+            document.getElementById('sort-full-asc').checked = true;
+            document.getElementById('sort-length-asc').checked = true;
+            // 重置数字输入框
+            document.getElementById('start-count-remove').value = 1;
+            document.getElementById('start-count-keep').value = 1;
+            document.getElementById('end-count-remove').value = 1;
+            document.getElementById('end-count-keep').value = 1;
+            // 重置替换功能输入框
+            document.getElementById('find-text').value = '';
+            document.getElementById('replace-with-text').value = '';
+        }
+
+        // 多文本处理 - 求并集
+        function calcUnion() {
+            const linesA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const linesB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const unionSet = new Set([...linesA, ...linesB]);
+            const result = Array.from(unionSet).join('\n');
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = result;
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本处理 - 求交集
+        function calcIntersection() {
+            const linesA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const linesB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const setB = new Set(linesB);
+            const intersection = linesA.filter(line => setB.has(line));
+            const uniqueIntersection = [...new Set(intersection)];
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = uniqueIntersection.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本处理 - 求差集
+        function calcDifference(type) {
+            const linesA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const linesB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            let difference = [];
+            if (type === 'a-b') {
+                const setB = new Set(linesB);
+                difference = linesA.filter(line => !setB.has(line));
+            } else if (type === 'b-a') {
+                const setA = new Set(linesA);
+                difference = linesB.filter(line => !setA.has(line));
+            }
+            const uniqueDifference = [...new Set(difference)];
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = uniqueDifference.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本处理 - 从B中筛选包含A内容的行
+        function filterBContainA() {
+            const linesA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const linesB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = linesB.filter(lineB => {
+                return linesA.some(lineA => lineB.includes(lineA));
+            });
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = [...new Set(result)].join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本处理 - 从A中筛选包含B内容的行
+        function filterAContainB() {
+            const linesA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const linesB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = linesA.filter(lineA => {
+                return linesB.some(lineB => lineA.includes(lineB));
+            });
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = [...new Set(result)].join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本处理 - 按行合并
+        function mergeLines() {
+            const linesA = document.getElementById('multi-input-a').value.split('\n');
+            const linesB = document.getElementById('multi-input-b').value.split('\n');
+            const separator = document.getElementById('merge-sep').value;
+            const merged = [];
+            const maxLen = Math.max(linesA.length, linesB.length);
+            for (let i = 0; i < maxLen; i++) {
+                const lineA = linesA[i] || '';
+                const lineB = linesB[i] || '';
+                merged.push(`${lineA}${separator}${lineB}`);
+            }
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = merged.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本清空函数
+        function clearMultiInput(type) {
+            if (type === 'a') {
+                const multiInputA = document.getElementById('multi-input-a');
+                multiInputA.value = '';
+                updateLineNumbers('multi-input-a');
+            } else if (type === 'b') {
+                const multiInputB = document.getElementById('multi-input-b');
+                multiInputB.value = '';
+                updateLineNumbers('multi-input-b');
+            }
+        }
+        function clearMultiOutput() {
+            const multiOutput = document.getElementById('multi-output');
+            multiOutput.value = '';
+            updateLineNumbers('multi-output');
+        }
+        function clearMultiAll() {
+            clearMultiInput('a');
+            clearMultiInput('b');
+            clearMultiOutput();
+            document.getElementById('merge-sep').value = '|';
+        }
+    </script>
+</body>
+</html>
