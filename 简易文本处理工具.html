@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -192,7 +192,7 @@
             align-items: center;
         }
         /* 排序相关样式补充 */
-        #column-sort-options {
+        #column-sort-options, #column-filter-options {
             margin-left: 20px;
         }
         /* 新增：行首尾处理样式 */
@@ -291,17 +291,22 @@
                     <label for="sort-desc">倒序</label>
                 </div>
 
-                <!-- 按列排序 -->
+                <!-- 按列排序（新增：分隔符前排序选项） -->
                 <div class="func-item">
                     <input type="checkbox" id="sort-by-column">
                     <label for="sort-by-column">按列排序</label>
                 </div>
-                <!-- 按列排序的子选项（默认隐藏） -->
+                <!-- 按列排序的子选项（新增：按分隔符前排序） -->
                 <div class="func-item sort-group" id="column-sort-options" style="display: none;">
                     <div class="func-item">
-                        <input type="radio" name="column-type" id="column-by-sep" checked>
-                        <label for="column-by-sep">从分隔符后开始排序</label>
+                        <input type="radio" name="column-type" id="column-by-sep-after" checked>
+                        <label for="column-by-sep-after">从分隔符后开始排序</label>
                         <input type="text" id="sort-sep" value="*" placeholder="分隔符">
+                    </div>
+                    <div class="func-item">
+                        <input type="radio" name="column-type" id="column-by-sep-before">
+                        <label for="column-by-sep-before">按分隔符前排序</label>
+                        <input type="text" id="sort-sep-before" value="*" placeholder="分隔符">
                     </div>
                     <div class="func-item">
                         <input type="radio" name="column-type" id="column-by-char-count">
@@ -444,17 +449,39 @@
                 </div>
                 <div class="func-item">
                     <input type="checkbox" id="keep-before">
-                    <label for="keep-before">每行保留</label>
+                    <label for="keep-before">保留</label>
                     <input type="text" id="split-char" value="*">
                     <label for="keep-before">之前文本</label>
                 </div>
                 <div class="func-item">
                     <input type="checkbox" id="keep-after">
-                    <label for="keep-after">每行保留</label>
+                    <label for="keep-after">保留</label>
                     <input type="text" id="split-char2" value="*">
                     <label for="keep-after">之后文本</label>
                 </div>
-                
+                <!-- 新增：按列筛选复选框 -->
+                <div class="func-item">
+                    <input type="checkbox" id="filter-by-column">
+                    <label for="filter-by-column">按列筛选</label>
+                </div>
+                <!-- 按列筛选的子选项（默认隐藏） -->
+                <div class="func-item sort-group" id="column-filter-options" style="display: none;">
+                    <div class="func-item">
+                        <input type="radio" name="column-filter-type" id="filter-column-by-sep-after" checked>
+                        <label for="filter-column-by-sep-after">从分隔符后开始筛选</label>
+                        <input type="text" id="filter-sep" value="*" placeholder="分隔符">
+                    </div>
+                    <div class="func-item">
+                        <input type="radio" name="column-filter-type" id="filter-column-by-sep-before">
+                        <label for="filter-column-by-sep-before">按分隔符前筛选</label>
+                        <input type="text" id="filter-sep-before" value="*" placeholder="分隔符">
+                    </div>
+                    <div class="func-item">
+                        <input type="radio" name="column-filter-type" id="filter-column-by-char-count">
+                        <label for="filter-column-by-char-count">从第N个字符后开始筛选</label>
+                        <input type="number" id="filter-char-index" value="1" min="1" placeholder="字符数">
+                    </div>
+                </div>
                 <button class="btn" style="width: 100%; margin-top: 10px;" onclick="processSingleText()">执行处理</button>
                 <button class="btn btn-secondary" style="width: 100%;" onclick="clearSingleAll()">清空所有内容</button>
             </div>
@@ -649,6 +676,12 @@
             optionsEl.style.display = this.checked ? 'block' : 'none';
         });
 
+        // 新增：按列筛选复选框显示/隐藏子选项
+        document.getElementById('filter-by-column').addEventListener('change', function() {
+            const optionsEl = document.getElementById('column-filter-options');
+            optionsEl.style.display = this.checked ? 'block' : 'none';
+        });
+
         // 新增：提取行内数字的函数
         function extractNumber(line) {
             // 提取行中的第一个数字（支持整数/小数），无数字返回0
@@ -656,20 +689,52 @@
             return match ? parseFloat(match[0]) : 0;
         }
 
-        // 新增：按列截取文本的函数
+        // 新增：按列排序截取文本的函数
         function getColumnText(line) {
             const isColumnSort = document.getElementById('sort-by-column').checked;
             if (!isColumnSort) return line;
 
             // 判断按列排序的类型
-            const isSepType = document.getElementById('column-by-sep').checked;
-            if (isSepType) {
+            const isSepAfterType = document.getElementById('column-by-sep-after').checked;
+            const isSepBeforeType = document.getElementById('column-by-sep-before').checked;
+            const isCharCountType = document.getElementById('column-by-char-count').checked;
+
+            if (isSepAfterType) {
                 const sep = document.getElementById('sort-sep').value;
                 const parts = line.split(sep);
                 // 分隔符不存在则返回空字符串
                 return parts.length > 1 ? parts.slice(1).join(sep) : '';
-            } else {
+            } else if (isSepBeforeType) {
+                const sep = document.getElementById('sort-sep-before').value;
+                const parts = line.split(sep);
+                // 取分隔符前的内容，无分隔符则返回整行（确保排序时不会忽略无分隔符的行）
+                return parts[0] || line;
+            } else if (isCharCountType) {
                 const charIndex = parseInt(document.getElementById('sort-char-index').value) || 1;
+                // 截取第N个字符后的内容
+                return line.slice(charIndex);
+            }
+            return line;
+        }
+
+        // 新增：按列筛选截取文本的函数
+        function getColumnFilterText(line) {
+            const isColumnFilter = document.getElementById('filter-by-column').checked;
+            if (!isColumnFilter) return line;
+
+            // 判断按列筛选的类型
+            if (document.getElementById('filter-column-by-sep-after').checked) {
+                const sep = document.getElementById('filter-sep').value;
+                const parts = line.split(sep);
+                // 分隔符不存在则返回空字符串
+                return parts.length > 1 ? parts.slice(1).join(sep) : '';
+            } else if (document.getElementById('filter-column-by-sep-before').checked) {
+                const sep = document.getElementById('filter-sep-before').value;
+                const parts = line.split(sep);
+                // 分隔符不存在则返回整行，否则返回分隔符前内容
+                return parts.length > 1 ? parts[0] : line;
+            } else {
+                const charIndex = parseInt(document.getElementById('filter-char-index').value) || 1;
                 // 截取第N个字符后的内容
                 return line.slice(charIndex);
             }
@@ -788,114 +853,71 @@
                 lines = lines.filter(line => line.trim() !== '');
             }
             if (document.getElementById('remove-start-space').checked) {
-                lines = lines.map(line => line.replace(/^\s+/, ''));
+                lines = lines.map(line => line.trimStart());
             }
             if (document.getElementById('remove-end-space').checked) {
-                lines = lines.map(line => line.replace(/\s+$/, ''));
+                lines = lines.map(line => line.trimEnd());
             }
 
-            // 3. 排序处理（重构）
-            const sortByChar = document.getElementById('sort-by-char').checked;
-            const sortByLength = document.getElementById('sort-by-length').checked;
-            const sortByNumber = document.getElementById('sort-by-number').checked;
-            const sortByColumn = document.getElementById('sort-by-column').checked;
-            const isAsc = document.getElementById('sort-asc').checked;
-
-            // 只有选中了排序类型才执行排序
-            if (sortByChar || sortByLength || sortByNumber) {
-                // 按列排序需要先截取列内容，再排序
-                lines.sort((a, b) => {
-                    let aCompare = a;
-                    let bCompare = b;
-
-                    // 按列排序：获取用于比较的列内容
-                    if (sortByColumn) {
-                        aCompare = getColumnText(a);
-                        bCompare = getColumnText(b);
-                    }
-
-                    // 根据选中的排序类型比较
-                    let compareResult = 0;
-                    if (sortByChar) {
-                        // 按字符顺序排序
-                        compareResult = aCompare.localeCompare(bCompare);
-                    } else if (sortByLength) {
-                        // 按字符数量排序
-                        compareResult = aCompare.length - bCompare.length;
-                    } else if (sortByNumber) {
-                        // 按数字排序
-                        const aNum = extractNumber(aCompare);
-                        const bNum = extractNumber(bCompare);
-                        compareResult = aNum - bNum;
-                    }
-
-                    // 处理正/倒序
-                    return isAsc ? compareResult : -compareResult;
-                });
-            }
-
-            // 4. 行首尾字符处理（重构：基于新的单选框逻辑）
-            // 行首处理
+            // 3. 行首尾字符处理
             if (document.getElementById('enable-head').checked) {
-                const headOpt = document.querySelector('input[name="head-opt"]:checked');
+                const headOpt = document.querySelector('input[name="head-opt"]:checked')?.id;
                 if (headOpt) {
-                    switch(headOpt.id) {
+                    switch(headOpt) {
                         case 'head-add':
-                            const headAddChar = document.getElementById('start-char').value;
-                            lines = lines.map(line => headAddChar + line);
+                            const startChar = document.getElementById('start-char').value;
+                            lines = lines.map(line => startChar + line);
                             break;
                         case 'head-remove':
-                            const headRemoveChar = document.getElementById('rm-start-char').value;
-                            lines = lines.map(line => line.startsWith(headRemoveChar) ? line.slice(headRemoveChar.length) : line);
+                            const rmStartChar = document.getElementById('rm-start-char').value;
+                            lines = lines.map(line => line.startsWith(rmStartChar) ? line.slice(rmStartChar.length) : line);
                             break;
                         case 'head-remove-count':
-                            const headRemoveCount = parseInt(document.getElementById('start-count-remove').value) || 1;
-                            lines = lines.map(line => line.slice(headRemoveCount));
+                            const startRemoveCount = parseInt(document.getElementById('start-count-remove').value) || 1;
+                            lines = lines.map(line => line.slice(startRemoveCount));
                             break;
                         case 'head-keep-count':
-                            const headKeepCount = parseInt(document.getElementById('start-count-keep').value) || 1;
-                            lines = lines.map(line => line.slice(0, headKeepCount));
+                            const startKeepCount = parseInt(document.getElementById('start-count-keep').value) || 1;
+                            lines = lines.map(line => line.slice(0, startKeepCount));
                             break;
                     }
                 }
             }
-
-            // 行尾处理
             if (document.getElementById('enable-tail').checked) {
-                const tailOpt = document.querySelector('input[name="tail-opt"]:checked');
+                const tailOpt = document.querySelector('input[name="tail-opt"]:checked')?.id;
                 if (tailOpt) {
-                    switch(tailOpt.id) {
+                    switch(tailOpt) {
                         case 'tail-add':
-                            const tailAddChar = document.getElementById('end-char').value;
-                            lines = lines.map(line => line + tailAddChar);
+                            const endChar = document.getElementById('end-char').value;
+                            lines = lines.map(line => line + endChar);
                             break;
                         case 'tail-remove':
-                            const tailRemoveChar = document.getElementById('rm-end-char').value;
-                            lines = lines.map(line => line.endsWith(tailRemoveChar) ? line.slice(0, -tailRemoveChar.length) : line);
+                            const rmEndChar = document.getElementById('rm-end-char').value;
+                            lines = lines.map(line => line.endsWith(rmEndChar) ? line.slice(0, -rmEndChar.length) : line);
                             break;
                         case 'tail-remove-count':
-                            const tailRemoveCount = parseInt(document.getElementById('end-count-remove').value) || 1;
-                            lines = lines.map(line => line.slice(0, -tailRemoveCount));
+                            const endRemoveCount = parseInt(document.getElementById('end-count-remove').value) || 1;
+                            lines = lines.map(line => line.slice(0, -endRemoveCount));
                             break;
                         case 'tail-keep-count':
-                            const tailKeepCount = parseInt(document.getElementById('end-count-keep').value) || 1;
-                            lines = lines.map(line => line.slice(-tailKeepCount));
+                            const endKeepCount = parseInt(document.getElementById('end-count-keep').value) || 1;
+                            lines = lines.map(line => line.slice(-endKeepCount));
                             break;
                     }
                 }
             }
 
-            // 5. 文本替换处理
+            // 4. 文本替换处理
             if (document.getElementById('replace-text').checked) {
                 const findText = document.getElementById('find-text').value;
                 const replaceWithText = document.getElementById('replace-with-text').value;
                 if (findText) {
-                    const regex = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
-                    lines = lines.map(line => line.replace(regex, replaceWithText));
+                    const reg = new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                    lines = lines.map(line => line.replace(reg, replaceWithText));
                 }
             }
 
-            // 6. 大小写转换处理
+            // 5. 大小写转换处理
             if (document.getElementById('enable-case-convert').checked) {
                 const caseType = document.querySelector('input[name="case-type"]:checked')?.id;
                 if (caseType) {
@@ -903,7 +925,7 @@
                 }
             }
 
-            // 7. 标点转换处理
+            // 6. 标点转换处理
             if (document.getElementById('enable-punct-convert').checked) {
                 const punctType = document.querySelector('input[name="punct-type"]:checked')?.id;
                 if (punctType) {
@@ -911,28 +933,100 @@
                 }
             }
 
-            // 8. 行筛选处理
-            if (document.getElementById('remove-contain').checked) {
-                const containRemove = document.getElementById('contain-remove').value;
-                lines = lines.filter(line => !line.includes(containRemove));
+            // 7. 行筛选处理（含新增按列筛选）
+            const hasFilterCondition = 
+                document.getElementById('remove-contain').checked ||
+                document.getElementById('keep-contain').checked ||
+                document.getElementById('keep-before').checked ||
+                document.getElementById('keep-after').checked;
+            
+            if (document.getElementById('filter-by-column').checked && hasFilterCondition) {
+                // 按列筛选 + 基础筛选组合
+                if (document.getElementById('remove-contain').checked) {
+                    const containText = document.getElementById('contain-remove').value;
+                    lines = lines.filter(line => {
+                        const filterText = getColumnFilterText(line);
+                        return !filterText.includes(containText);
+                    });
+                }
+                if (document.getElementById('keep-contain').checked) {
+                    const containText = document.getElementById('contain-keep').value;
+                    lines = lines.filter(line => {
+                        const filterText = getColumnFilterText(line);
+                        return filterText.includes(containText);
+                    });
+                }
+                if (document.getElementById('keep-before').checked) {
+                    const splitChar = document.getElementById('split-char').value;
+                    lines = lines.map(line => {
+                        const filterText = getColumnFilterText(line);
+                        const parts = filterText.split(splitChar);
+                        return parts.length > 1 ? parts[0] : filterText;
+                    });
+                }
+                if (document.getElementById('keep-after').checked) {
+                    const splitChar = document.getElementById('split-char2').value;
+                    lines = lines.map(line => {
+                        const filterText = getColumnFilterText(line);
+                        const parts = filterText.split(splitChar);
+                        return parts.length > 1 ? parts.slice(1).join(splitChar) : filterText;
+                    });
+                }
+            } else if (hasFilterCondition) {
+                // 仅基础筛选（无按列筛选）
+                if (document.getElementById('remove-contain').checked) {
+                    const containText = document.getElementById('contain-remove').value;
+                    lines = lines.filter(line => !line.includes(containText));
+                }
+                if (document.getElementById('keep-contain').checked) {
+                    const containText = document.getElementById('contain-keep').value;
+                    lines = lines.filter(line => line.includes(containText));
+                }
+                if (document.getElementById('keep-before').checked) {
+                    const splitChar = document.getElementById('split-char').value;
+                    lines = lines.map(line => {
+                        const parts = line.split(splitChar);
+                        return parts.length > 1 ? parts[0] : line;
+                    });
+                }
+                if (document.getElementById('keep-after').checked) {
+                    const splitChar = document.getElementById('split-char2').value;
+                    lines = lines.map(line => {
+                        const parts = line.split(splitChar);
+                        return parts.length > 1 ? parts.slice(1).join(splitChar) : line;
+                    });
+                }
             }
-            if (document.getElementById('keep-contain').checked) {
-                const containKeep = document.getElementById('contain-keep').value;
-                lines = lines.filter(line => line.includes(containKeep));
-            }
-            if (document.getElementById('keep-before').checked) {
-                const splitChar = document.getElementById('split-char').value;
-                lines = lines.map(line => {
-                    const index = line.indexOf(splitChar);
-                    return index !== -1 ? line.slice(0, index) : line;
-                });
-            }
-            if (document.getElementById('keep-after').checked) {
-                const splitChar2 = document.getElementById('split-char2').value;
-                lines = lines.map(line => {
-                    const index = line.indexOf(splitChar2);
-                    return index !== -1 ? line.slice(index + splitChar2.length) : line;
-                });
+
+            // 8. 排序处理
+            const sortType = document.querySelector('input[name="sort-type"]:checked')?.id;
+            const sortOrder = document.querySelector('input[name="sort-order"]:checked')?.id;
+            const isAsc = sortOrder === 'sort-asc';
+
+            if (sortType) {
+                switch(sortType) {
+                    case 'sort-by-char':
+                        lines.sort((a, b) => {
+                            const aCol = getColumnText(a);
+                            const bCol = getColumnText(b);
+                            return isAsc ? aCol.localeCompare(bCol, 'zh-CN') : bCol.localeCompare(aCol, 'zh-CN');
+                        });
+                        break;
+                    case 'sort-by-length':
+                        lines.sort((a, b) => {
+                            const aCol = getColumnText(a);
+                            const bCol = getColumnText(b);
+                            return isAsc ? aCol.length - bCol.length : bCol.length - aCol.length;
+                        });
+                        break;
+                    case 'sort-by-number':
+                        lines.sort((a, b) => {
+                            const aNum = extractNumber(getColumnText(a));
+                            const bNum = extractNumber(getColumnText(b));
+                            return isAsc ? aNum - bNum : bNum - aNum;
+                        });
+                        break;
+                }
             }
 
             // 9. 输出结果
@@ -946,121 +1040,25 @@
             document.getElementById('single-input').value = '';
             updateLineNumbers('single-input');
         }
-
         function clearSingleOutput() {
             document.getElementById('single-output').value = '';
             updateLineNumbers('single-output');
         }
-
         function clearSingleAll() {
             clearSingleInput();
             clearSingleOutput();
-            // 重置所有复选框/单选框
+            // 重置复选框/单选框
             document.querySelectorAll('#single-text input[type="checkbox"], #single-text input[type="radio"]').forEach(input => {
-                if (input.name === 'sort-order' && input.id === 'sort-asc') {
-                    input.checked = true;
-                } else if (input.name !== 'sort-order') {
-                    input.checked = false;
-                }
+                if (input.type === 'checkbox') input.checked = false;
+                else if (input.name === 'sort-order') input.checked = input.id === 'sort-asc';
             });
             // 隐藏子选项
             document.getElementById('column-sort-options').style.display = 'none';
-            document.getElementById('case-convert-options').style.display = 'none';
-            document.getElementById('punct-convert-options').style.display = 'none';
             document.getElementById('head-options').classList.remove('active');
             document.getElementById('tail-options').classList.remove('active');
-        }
-
-        // 多文本处理函数
-        function getLines(id) {
-            const text = document.getElementById(id).value;
-            return text === '' ? [] : text.split('\n');
-        }
-
-        function setMultiOutput(lines) {
-            const output = document.getElementById('multi-output');
-            output.value = lines.join('\n');
-            updateLineNumbers('multi-output');
-        }
-
-        // 集合运算：并集
-        function calcUnion() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const unionSet = new Set([...linesA, ...linesB]);
-            setMultiOutput(Array.from(unionSet));
-        }
-
-        // 集合运算：交集
-        function calcIntersection() {
-            const linesA = getLines('multi-input-a');
-            const setB = new Set(getLines('multi-input-b'));
-            const intersection = linesA.filter(line => setB.has(line));
-            // 去重
-            setMultiOutput(Array.from(new Set(intersection)));
-        }
-
-        // 集合运算：差集
-        function calcDifference(type) {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            let difference;
-            if (type === 'a-b') {
-                const setB = new Set(linesB);
-                difference = linesA.filter(line => !setB.has(line));
-            } else {
-                const setA = new Set(linesA);
-                difference = linesB.filter(line => !setA.has(line));
-            }
-            // 去重
-            setMultiOutput(Array.from(new Set(difference)));
-        }
-
-        // 包含筛选：从B中筛选包含A内容的行
-        function filterBContainA() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const result = linesB.filter(lineB => linesA.some(lineA => lineB.includes(lineA)));
-            setMultiOutput(Array.from(new Set(result)));
-        }
-
-        // 包含筛选：从A中筛选包含B内容的行
-        function filterAContainB() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const result = linesA.filter(lineA => linesB.some(lineB => lineA.includes(lineB)));
-            setMultiOutput(Array.from(new Set(result)));
-        }
-
-        // 包含筛选：从B中去除包含A内容的行
-        function filterBRemoveA() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const result = linesB.filter(lineB => !linesA.some(lineA => lineB.includes(lineA)));
-            setMultiOutput(Array.from(new Set(result)));
-        }
-
-        // 包含筛选：从A中去除包含B内容的行
-        function filterARemoveB() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const result = linesA.filter(lineA => !linesB.some(lineB => lineA.includes(lineB)));
-            setMultiOutput(Array.from(new Set(result)));
-        }
-
-        // 按行合并
-        function mergeLines() {
-            const linesA = getLines('multi-input-a');
-            const linesB = getLines('multi-input-b');
-            const sep = document.getElementById('merge-sep').value;
-            const merged = [];
-            const maxLen = Math.max(linesA.length, linesB.length);
-            for (let i = 0; i < maxLen; i++) {
-                const lineA = linesA[i] || '';
-                const lineB = linesB[i] || '';
-                merged.push(`${lineA}${sep}${lineB}`);
-            }
-            setMultiOutput(merged);
+            document.getElementById('case-convert-options').style.display = 'none';
+            document.getElementById('punct-convert-options').style.display = 'none';
+            document.getElementById('column-filter-options').style.display = 'none';
         }
 
         // 多文本清空函数
@@ -1068,16 +1066,101 @@
             document.getElementById(`multi-input-${type}`).value = '';
             updateLineNumbers(`multi-input-${type}`);
         }
-
         function clearMultiOutput() {
             document.getElementById('multi-output').value = '';
             updateLineNumbers('multi-output');
         }
-
         function clearMultiAll() {
             clearMultiInput('a');
             clearMultiInput('b');
             clearMultiOutput();
+        }
+
+        // 多文本集合运算：并集
+        function calcUnion() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const unionSet = new Set([...textA, ...textB]);
+            const result = Array.from(unionSet).join('\n');
+            document.getElementById('multi-output').value = result;
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本集合运算：交集
+        function calcIntersection() {
+            const textA = new Set(document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== ''));
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const intersection = textB.filter(line => textA.has(line));
+            const result = intersection.join('\n');
+            document.getElementById('multi-output').value = result;
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本集合运算：差集
+        function calcDifference(type) {
+            const textA = new Set(document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== ''));
+            const textB = new Set(document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== ''));
+            let difference = [];
+            if (type === 'a-b') {
+                difference = Array.from(textA).filter(line => !textB.has(line));
+            } else {
+                difference = Array.from(textB).filter(line => !textA.has(line));
+            }
+            const result = difference.join('\n');
+            document.getElementById('multi-output').value = result;
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本包含筛选：从B中筛选包含A内容的行
+        function filterBContainA() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = textB.filter(line => textA.some(a => line.includes(a)));
+            document.getElementById('multi-output').value = result.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本包含筛选：从A中筛选包含B内容的行
+        function filterAContainB() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = textA.filter(line => textB.some(b => line.includes(b)));
+            document.getElementById('multi-output').value = result.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本包含筛选：从B中去除包含A内容的行
+        function filterBRemoveA() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = textB.filter(line => !textA.some(a => line.includes(a)));
+            document.getElementById('multi-output').value = result.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本包含筛选：从A中去除包含B内容的行
+        function filterARemoveB() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const result = textA.filter(line => !textB.some(b => line.includes(b)));
+            document.getElementById('multi-output').value = result.join('\n');
+            updateLineNumbers('multi-output');
+        }
+
+        // 多文本按行合并
+        function mergeLines() {
+            const textA = document.getElementById('multi-input-a').value.split('\n').filter(line => line.trim() !== '');
+            const textB = document.getElementById('multi-input-b').value.split('\n').filter(line => line.trim() !== '');
+            const sep = document.getElementById('merge-sep').value;
+            const result = [];
+            const maxLen = Math.max(textA.length, textB.length);
+            for (let i = 0; i < maxLen; i++) {
+                const aLine = textA[i] || '';
+                const bLine = textB[i] || '';
+                result.push(`${aLine}${sep}${bLine}`);
+            }
+            document.getElementById('multi-output').value = result.join('\n');
+            updateLineNumbers('multi-output');
         }
     </script>
 </body>
